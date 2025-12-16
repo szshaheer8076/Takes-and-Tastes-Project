@@ -1,0 +1,22 @@
+{
+  "expo": {
+    "name": "Takes and Tastes",
+    "slug": "takes-and-tastes",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.takesandtastes.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#FF6B35"
+      },
+      "package": "com.takesandtastes.app"
+    }
+  }
+}
