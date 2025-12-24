@@ -5,6 +5,10 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#FF6B35"
+    },
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -16,7 +20,22 @@
       "adaptiveIcon": {
         "backgroundColor": "#FF6B35"
       },
-      "package": "com.takesandtastes.app"
+      "package": "com.takesandtastes.app",
+      "versionCode": 1
+    },
+    "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#FF6B35",
+          "imageWidth": 200
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "a2582d4b-df52-468e-ac75-7e7fb614e914"
+      }
     }
   }
 }

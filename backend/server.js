@@ -1,4 +1,4 @@
-
+// backend/server.js
 const express = require('express');
 const dotenv = require('dotenv');
 const cors = require('cors');
@@ -16,10 +16,10 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Enable CORS
+// Enable CORS (dev-friendly: allow all origins)
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || '*',
+    origin: '*',
     credentials: true,
   })
 );
@@ -64,19 +64,16 @@ const PORT = process.env.PORT || 5000;
 
 const server = app.listen(PORT, () => {
   console.log(`
-    
-   Takes and Tastes API Server Running   
-       Port: ${PORT}                           ║
-      Environment: ${process.env.NODE_ENV || 'development'}   
+   Takes and Tastes API Server Running
+       Port: ${PORT}
+      Environment: ${process.env.NODE_ENV || 'development'}
   `);
 });
 
 // Handle unhandled promise rejections
-process.on('unhandledRejection', (err, promise) => {
+process.on('unhandledRejection', (err) => {
   console.log(`Error: ${err.message}`);
   server.close(() => process.exit(1));
 });
 
 module.exports = app;
-
-

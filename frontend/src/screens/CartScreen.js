@@ -1,3 +1,4 @@
+// src/screens/CartScreen.js
 import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView, Image } from 'react-native';
 import { Text, Button, Divider, Snackbar } from 'react-native-paper';
@@ -19,9 +20,11 @@ const CartScreen = ({ navigation }) => {
   const [snackbarVisible, setSnackbarVisible] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
 
-  const subtotal = getCartTotal();
-  const deliveryFee = restaurant?.deliveryFee || 50;
-  const discount = 0;
+  // getCartTotal() returns { subtotal, deliveryFee, total } as strings
+  const totals = getCartTotal();
+  const subtotal = parseFloat(totals.subtotal) || 0;
+  const deliveryFee = parseFloat(totals.deliveryFee) || 0;
+  const discount = 0; // adjust if you introduce discounts later
   const total = subtotal + deliveryFee - discount;
 
   const handleRemoveItem = (itemId) => {
@@ -56,7 +59,9 @@ const CartScreen = ({ navigation }) => {
       <View style={styles.emptyContainer}>
         <Ionicons name="cart-outline" size={100} color={COLORS.grey} />
         <Text style={styles.emptyTitle}>Your cart is empty</Text>
-        <Text style={styles.emptyText}>Add items from restaurants to get started</Text>
+        <Text style={styles.emptyText}>
+          Add items from restaurants to get started
+        </Text>
         <Button
           mode="contained"
           onPress={() => navigation.navigate('Home')}
@@ -74,13 +79,24 @@ const CartScreen = ({ navigation }) => {
         {/* Restaurant Info */}
         {restaurant && (
           <View style={styles.restaurantInfo}>
-            <Image source={{ uri: restaurant.logo }} style={styles.restaurantLogo} />
+            {restaurant.logo && (
+              <Image
+                source={{ uri: restaurant.logo }}
+                style={styles.restaurantLogo}
+              />
+            )}
             <View style={styles.restaurantDetails}>
               <Text style={styles.restaurantName}>{restaurant.name}</Text>
-              <Text style={styles.restaurantDelivery}>
-                <Ionicons name="time-outline" size={14} color={COLORS.grey} />
-                {' '}{restaurant.deliveryTime}
-              </Text>
+              {restaurant.deliveryTime && (
+                <Text style={styles.restaurantDelivery}>
+                  <Ionicons
+                    name="time-outline"
+                    size={14}
+                    color={COLORS.grey}
+                  />{' '}
+                  {restaurant.deliveryTime}
+                </Text>
+              )}
             </View>
             <Button
               mode="text"
@@ -111,21 +127,29 @@ const CartScreen = ({ navigation }) => {
 
           <View style={styles.priceRow}>
             <Text style={styles.priceLabel}>Subtotal</Text>
-            <Text style={styles.priceValue}>Rs. {subtotal}</Text>
+            <Text style={styles.priceValue}>
+              Rs. {subtotal.toFixed(2)}
+            </Text>
           </View>
 
           <View style={styles.priceRow}>
             <Text style={styles.priceLabel}>Delivery Fee</Text>
-            <Text style={styles.priceValue}>Rs. {deliveryFee}</Text>
+            <Text style={styles.priceValue}>
+              Rs. {deliveryFee.toFixed(2)}
+            </Text>
           </View>
 
           {discount > 0 && (
             <View style={styles.priceRow}>
-              <Text style={[styles.priceLabel, { color: COLORS.success }]}>
+              <Text
+                style={[styles.priceLabel, { color: COLORS.success }]}
+              >
                 Discount
               </Text>
-              <Text style={[styles.priceValue, { color: COLORS.success }]}>
-                - Rs. {discount}
+              <Text
+                style={[styles.priceValue, { color: COLORS.success }]}
+              >
+                - Rs. {discount.toFixed(2)}
               </Text>
             </View>
           )}
@@ -134,7 +158,9 @@ const CartScreen = ({ navigation }) => {
 
           <View style={styles.priceRow}>
             <Text style={styles.totalLabel}>Total</Text>
-            <Text style={styles.totalValue}>Rs. {total}</Text>
+            <Text style={styles.totalValue}>
+              Rs. {total.toFixed(2)}
+            </Text>
           </View>
         </View>
       </ScrollView>
@@ -147,7 +173,7 @@ const CartScreen = ({ navigation }) => {
           style={styles.checkoutButton}
           labelStyle={styles.checkoutButtonLabel}
         >
-          Proceed to Checkout • Rs. {total}
+          Proceed to Checkout • Rs. {total.toFixed(2)}
         </Button>
       </View>
 

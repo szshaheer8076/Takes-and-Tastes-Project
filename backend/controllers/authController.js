@@ -1,3 +1,4 @@
+// backend/controllers/authController.js
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
@@ -41,19 +42,24 @@ exports.register = async (req, res) => {
       phone,
     });
 
-    if (user) {
-      res.status(201).json({
-        success: true,
-        data: {
-          _id: user._id,
-          name: user.name,
-          email: user.email,
-          phone: user.phone,
-          role: user.role,
-          token: generateToken(user._id),
-        },
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid user data',
       });
     }
+
+    res.status(201).json({
+      success: true,
+      token: generateToken(user._id),
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+      },
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({
@@ -101,14 +107,14 @@ exports.login = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: {
+      token: generateToken(user._id),
+      user: {
         _id: user._id,
         name: user.name,
         email: user.email,
         phone: user.phone,
         role: user.role,
         address: user.address,
-        token: generateToken(user._id),
       },
     });
   } catch (error) {
@@ -149,42 +155,42 @@ exports.updateProfile = async (req, res) => {
   try {
     const user = await User.findById(req.user._id);
 
-    if (user) {
-      user.name = req.body.name || user.name;
-      user.email = req.body.email || user.email;
-      user.phone = req.body.phone || user.phone;
-
-      if (req.body.address) {
-        user.address = {
-          ...user.address,
-          ...req.body.address,
-        };
-      }
-
-      if (req.body.password) {
-        user.password = req.body.password;
-      }
-
-      const updatedUser = await user.save();
-
-      res.status(200).json({
-        success: true,
-        data: {
-          _id: updatedUser._id,
-          name: updatedUser.name,
-          email: updatedUser.email,
-          phone: updatedUser.phone,
-          address: updatedUser.address,
-          role: updatedUser.role,
-          token: generateToken(updatedUser._id),
-        },
-      });
-    } else {
-      res.status(404).json({
+    if (!user) {
+      return res.status(404).json({
         success: false,
         message: 'User not found',
       });
     }
+
+    user.name = req.body.name || user.name;
+    user.email = req.body.email || user.email;
+    user.phone = req.body.phone || user.phone;
+
+    if (req.body.address) {
+      user.address = {
+        ...user.address,
+        ...req.body.address,
+      };
+    }
+
+    if (req.body.password) {
+      user.password = req.body.password;
+    }
+
+    const updatedUser = await user.save();
+
+    res.status(200).json({
+      success: true,
+      token: generateToken(updatedUser._id),
+      user: {
+        _id: updatedUser._id,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        phone: updatedUser.phone,
+        address: updatedUser.address,
+        role: updatedUser.role,
+      },
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({

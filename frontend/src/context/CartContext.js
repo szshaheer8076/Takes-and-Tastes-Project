@@ -1,16 +1,24 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+// src/context/CartContext.js
+import React, {
+  createContext,
+  useState,
+  useEffect,
+  useContext,
+} from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const CartContext = createContext();
+export const CartContext = createContext(null);
 
 export const CartProvider = ({ children }) => {
   const [cartItems, setCartItems] = useState([]);
   const [restaurant, setRestaurant] = useState(null);
 
+  // Load cart from storage on mount
   useEffect(() => {
     loadCart();
   }, []);
 
+  // Save cart to storage whenever it changes
   useEffect(() => {
     saveCart();
   }, [cartItems, restaurant]);
@@ -27,74 +35,103 @@ export const CartProvider = ({ children }) => {
         setRestaurant(JSON.parse(savedRestaurant));
       }
     } catch (error) {
-      console.error('Error loading cart:', error);
+      console.error('[Cart] Error loading cart:', error);
     }
   };
 
   const saveCart = async () => {
     try {
       await AsyncStorage.setItem('cart', JSON.stringify(cartItems));
+
       if (restaurant) {
-        await AsyncStorage.setItem('cartRestaurant', JSON.stringify(restaurant));
+        await AsyncStorage.setItem(
+          'cartRestaurant',
+          JSON.stringify(restaurant)
+        );
+      } else {
+        await AsyncStorage.removeItem('cartRestaurant');
       }
     } catch (error) {
-      console.error('Error saving cart:', error);
+      console.error('[Cart] Error saving cart:', error);
     }
   };
 
-  const addToCart = (item, selectedRestaurant) => {
-    // Check if item is from a different restaurant
-    if (restaurant && restaurant._id !== selectedRestaurant._id) {
-      return {
-        success: false,
-        message: 'You can only order from one restaurant at a time. Clear cart first.',
+  /**
+   * Add an item to the cart.
+   * If there is already a cart from another restaurant,
+   * it clears the cart and starts a new one for the new restaurant.
+   */
+  const addToCart = (item, restaurantInfo) => {
+    console.log('[Cart] Adding item:', item.name);
+
+    // Check if adding from different restaurant
+    if (restaurant && restaurant._id !== restaurantInfo._id) {
+      console.log('[Cart] Different restaurant detected, clearing cart');
+      // Start new cart for new restaurant
+      setCartItems([{ ...item, quantity: item.quantity || 1 }]);
+      setRestaurant(restaurantInfo);
+      return { success: true, cleared: true };
+    }
+
+    // Check if item already in cart
+    const existingIndex = cartItems.findIndex(
+      (cartItem) => cartItem._id === item._id
+    );
+
+    if (existingIndex > -1) {
+      // Update quantity
+      const updatedCart = [...cartItems];
+      updatedCart[existingIndex] = {
+        ...updatedCart[existingIndex],
+        quantity:
+          (updatedCart[existingIndex].quantity || 0) + (item.quantity || 1),
       };
-    }
-
-    // Set restaurant if not set
-    if (!restaurant) {
-      setRestaurant(selectedRestaurant);
-    }
-
-    const existingItem = cartItems.find((i) => i._id === item._id);
-
-    if (existingItem) {
-      setCartItems(
-        cartItems.map((i) =>
-          i._id === item._id ? { ...i, quantity: i.quantity + 1 } : i
-        )
-      );
+      setCartItems(updatedCart);
+      console.log('[Cart] Updated quantity for:', item.name);
     } else {
-      setCartItems([...cartItems, { ...item, quantity: 1 }]);
+      // Add new item
+      setCartItems([
+        ...cartItems,
+        { ...item, quantity: item.quantity || 1 },
+      ]);
+      console.log('[Cart] Added new item:', item.name);
     }
 
-    return { success: true };
+    // Set restaurant if first item
+    if (!restaurant) {
+      setRestaurant(restaurantInfo);
+    }
+
+    return { success: true, cleared: false };
   };
 
   const removeFromCart = (itemId) => {
-    const newCart = cartItems.filter((item) => item._id !== itemId);
-    setCartItems(newCart);
+    console.log('[Cart] Removing item:', itemId);
+    const updatedCart = cartItems.filter((item) => item._id !== itemId);
+    setCartItems(updatedCart);
 
     // Clear restaurant if cart is empty
-    if (newCart.length === 0) {
+    if (updatedCart.length === 0) {
       setRestaurant(null);
     }
   };
 
   const updateQuantity = (itemId, quantity) => {
-    if (quantity < 1) {
+    console.log('[Cart] Updating quantity for:', itemId, 'to:', quantity);
+
+    if (quantity <= 0) {
       removeFromCart(itemId);
       return;
     }
 
-    setCartItems(
-      cartItems.map((item) =>
-        item._id === itemId ? { ...item, quantity } : item
-      )
+    const updatedCart = cartItems.map((item) =>
+      item._id === itemId ? { ...item, quantity } : item
     );
+    setCartItems(updatedCart);
   };
 
   const clearCart = () => {
+    console.log('[Cart] Clearing cart');
     setCartItems([]);
     setRestaurant(null);
     AsyncStorage.removeItem('cart');
@@ -102,35 +139,47 @@ export const CartProvider = ({ children }) => {
   };
 
   const getCartTotal = () => {
-    return cartItems.reduce((total, item) => total + item.price * item.quantity, 0);
+    const subtotal = cartItems.reduce(
+      (total, item) =>
+        total + (item.price || 0) * (item.quantity || 0),
+      0
+    );
+    const deliveryFee = restaurant?.deliveryFee || 0;
+    return {
+      subtotal: subtotal.toFixed(2),
+      deliveryFee: deliveryFee.toFixed(2),
+      total: (subtotal + deliveryFee).toFixed(2),
+    };
   };
 
   const getCartCount = () => {
-    return cartItems.reduce((count, item) => count + item.quantity, 0);
+    return cartItems.reduce(
+      (count, item) => count + (item.quantity || 0),
+      0
+    );
+  };
+
+  const value = {
+    cartItems,
+    restaurant,
+    addToCart,
+    removeFromCart,
+    updateQuantity,
+    clearCart,
+    getCartTotal,
+    getCartCount,
   };
 
   return (
-    <CartContext.Provider
-      value={{
-        cartItems,
-        restaurant,
-        addToCart,
-        removeFromCart,
-        updateQuantity,
-        clearCart,
-        getCartTotal,
-        getCartCount,
-      }}
-    >
-      {children}
-    </CartContext.Provider>
+    <CartContext.Provider value={value}>{children}</CartContext.Provider>
   );
 };
 
+// Custom hook to use the cart in components
 export const useCart = () => {
   const context = useContext(CartContext);
   if (!context) {
-    throw new Error('useCart must be used within CartProvider');
+    throw new Error('useCart must be used within a CartProvider');
   }
   return context;
 };

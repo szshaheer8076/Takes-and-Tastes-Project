@@ -1,10 +1,8 @@
-// API Configuration
-export const API_BASE_URL = 'http://192.168.1.19/api'; // Change to your IP address
+// src/utils/constants.js
 
-// Replace 192.168.1.100 with your actual local IP address
-// To find your IP:
-// Windows: ipconfig
-// Mac/Linux: ifconfig or ip addr show
+// IMPORTANT: Change 192.168.X.X to your PC's IPv4 address from `ipconfig`
+export const API_BASE_URL = 'http://192.168.1.17:5000/api';
+// Example: 'http://192.168.0.23:5000/api'
 
 export const COLORS = {
   primary: '#FF6B35',

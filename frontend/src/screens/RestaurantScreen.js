@@ -1,3 +1,4 @@
+// src/screens/RestaurantScreen.js
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -15,7 +16,9 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import { COLORS, SHADOWS } from '../utils/constants';
 
 const RestaurantScreen = ({ route, navigation }) => {
-  const { id } = route.params;
+  // HomeScreen navigates with: navigation.navigate('Restaurant', { restaurantId: item._id })
+  const { restaurantId } = route.params;
+
   const [restaurant, setRestaurant] = useState(null);
   const [menuItems, setMenuItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -27,15 +30,19 @@ const RestaurantScreen = ({ route, navigation }) => {
 
   useEffect(() => {
     loadRestaurant();
-  }, [id]);
+  }, [restaurantId]);
 
   const loadRestaurant = async () => {
     try {
-      const response = await restaurantAPI.getById(id);
+      const response = await restaurantAPI.getById(restaurantId);
 
       if (response.data.success) {
-        setRestaurant(response.data.data);
-        setMenuItems(response.data.data.menuItems || []);
+        const data = response.data.data;
+        setRestaurant(data);
+        setMenuItems(data.menuItems || []);
+      } else {
+        setSnackbarMessage('Failed to load restaurant');
+        setSnackbarVisible(true);
       }
     } catch (error) {
       console.error('Error loading restaurant:', error);
@@ -53,13 +60,26 @@ const RestaurantScreen = ({ route, navigation }) => {
   };
 
   const handleAddToCart = (item) => {
+    if (!restaurant) {
+      setSnackbarMessage('Restaurant data not loaded yet');
+      setSnackbarVisible(true);
+      return;
+    }
+
     const result = addToCart(item, restaurant);
 
     if (result.success) {
       setSnackbarMessage(`${item.name} added to cart`);
-    } else {
+      if (result.cleared) {
+        // Optional: let user know cart was cleared due to different restaurant
+        // setSnackbarMessage(`${item.name} added to a new cart for this restaurant`);
+      }
+    } else if (result.message) {
       setSnackbarMessage(result.message);
+    } else {
+      setSnackbarMessage('Could not add item to cart');
     }
+
     setSnackbarVisible(true);
   };
 
@@ -93,27 +113,41 @@ const RestaurantScreen = ({ route, navigation }) => {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        <Image source={{ uri: restaurant.image }} style={styles.image} />
+        {restaurant.image && (
+          <Image source={{ uri: restaurant.image }} style={styles.image} />
+        )}
 
         <View style={styles.infoContainer}>
           <View style={styles.header}>
-            <Image source={{ uri: restaurant.logo }} style={styles.logo} />
+            {restaurant.logo && (
+              <Image source={{ uri: restaurant.logo }} style={styles.logo} />
+            )}
             <View style={styles.headerInfo}>
               <Text style={styles.name}>{restaurant.name}</Text>
-              <Text style={styles.description}>{restaurant.description}</Text>
+              {restaurant.description ? (
+                <Text style={styles.description}>
+                  {restaurant.description}
+                </Text>
+              ) : null}
             </View>
           </View>
 
           <View style={styles.detailsRow}>
-            <Chip icon="star" style={styles.chip}>
-              {restaurant.rating}
-            </Chip>
-            <Chip icon="clock-outline" style={styles.chip}>
-              {restaurant.deliveryTime}
-            </Chip>
-            <Chip icon="bike" style={styles.chip}>
-              Rs. {restaurant.deliveryFee}
-            </Chip>
+            {restaurant.rating != null && (
+              <Chip icon="star" style={styles.chip}>
+                {restaurant.rating}
+              </Chip>
+            )}
+            {restaurant.deliveryTime && (
+              <Chip icon="clock-outline" style={styles.chip}>
+                {restaurant.deliveryTime}
+              </Chip>
+            )}
+            {restaurant.deliveryFee != null && (
+              <Chip icon="bike" style={styles.chip}>
+                Rs. {restaurant.deliveryFee}
+              </Chip>
+            )}
           </View>
 
           {restaurant.discount > 0 && (
@@ -144,8 +178,14 @@ const RestaurantScreen = ({ route, navigation }) => {
               ))
             ) : (
               <View style={styles.emptyMenu}>
-                <Ionicons name="fast-food-outline" size={64} color={COLORS.grey} />
-                <Text style={styles.emptyMenuText}>No menu items available</Text>
+                <Ionicons
+                  name="fast-food-outline"
+                  size={64}
+                  color={COLORS.grey}
+                />
+                <Text style={styles.emptyMenuText}>
+                  No menu items available
+                </Text>
               </View>
             )}
           </View>
@@ -236,48 +276,49 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   menuContainer: {
-marginTop: 8,
-},
-menuTitle: {
-fontSize: 22,
-fontWeight: 'bold',
-color: COLORS.dark,
-marginBottom: 16,
-},
-categorySection: {
-marginBottom: 24,
-},
-categoryTitle: {
-fontSize: 18,
-fontWeight: '600',
-color: COLORS.dark,
-marginBottom: 12,
-paddingLeft: 4,
-},
-emptyMenu: {
-alignItems: 'center',
-paddingVertical: 40,
-},
-emptyMenuText: {
-fontSize: 16,
-color: COLORS.grey,
-marginTop: 16,
-},
-errorContainer: {
-flex: 1,
-justifyContent: 'center',
-alignItems: 'center',
-},
-errorText: {
-fontSize: 16,
-color: COLORS.error,
-},
-fab: {
-position: 'absolute',
-margin: 16,
-right: 0,
-bottom: 0,
-backgroundColor: COLORS.primary,
-},
+    marginTop: 8,
+  },
+  menuTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: COLORS.dark,
+    marginBottom: 16,
+  },
+  categorySection: {
+    marginBottom: 24,
+  },
+  categoryTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: COLORS.dark,
+    marginBottom: 12,
+    paddingLeft: 4,
+  },
+  emptyMenu: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyMenuText: {
+    fontSize: 16,
+    color: COLORS.grey,
+    marginTop: 16,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorText: {
+    fontSize: 16,
+    color: COLORS.error,
+  },
+  fab: {
+    position: 'absolute',
+    margin: 16,
+    right: 0,
+    bottom: 0,
+    backgroundColor: COLORS.primary,
+  },
 });
+
 export default RestaurantScreen;

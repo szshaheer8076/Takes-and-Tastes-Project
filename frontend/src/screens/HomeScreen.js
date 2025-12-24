@@ -1,33 +1,39 @@
-import React, { useState, useEffect, useCallback } from 'react';
+// src/screens/HomeScreen.js
+import React, { useState, useEffect, useContext } from 'react';
 import {
   View,
   StyleSheet,
+  FlatList,
   ScrollView,
   RefreshControl,
-  FlatList,
+  TouchableOpacity,
 } from 'react-native';
-import { Text, Snackbar, FAB } from 'react-native-paper';
+import {
+  Text,
+  Searchbar,
+  Card,
+  ActivityIndicator,
+  Chip,
+  Badge,
+  useTheme,
+} from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
+import { AuthContext } from '../context/AuthContext';
+import { CartContext } from '../context/CartContext';
 import { restaurantAPI } from '../services/api';
-import { useCart } from '../context/CartContext';
 import RestaurantCard from '../components/RestaurantCard';
-import CategoryCard from '../components/CategoryCard';
-import SearchBar from '../components/SearchBar';
-import LoadingSpinner from '../components/LoadingSpinner';
-import { COLORS } from '../utils/constants';
 
-const HomeScreen = ({ navigation }) => {
+export default function HomeScreen({ navigation }) {
+  const theme = useTheme();
+  const { user } = useContext(AuthContext);
+  const { getCartCount } = useContext(CartContext);
+
   const [restaurants, setRestaurants] = useState([]);
-  const [filteredRestaurants, setFilteredRestaurants] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState(null); // will store category name (string)
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState(null);
-  const [snackbarVisible, setSnackbarVisible] = useState(false);
-  const [snackbarMessage, setSnackbarMessage] = useState('');
-
-  const { getCartCount } = useCart();
 
   useEffect(() => {
     console.log('[HomeScreen] mounted');
@@ -36,206 +42,278 @@ const HomeScreen = ({ navigation }) => {
 
   useEffect(() => {
     console.log('[Filter] search:', searchQuery, 'category:', selectedCategory);
-    filterRestaurants();
-  }, [searchQuery, selectedCategory, restaurants]);
+  }, [searchQuery, selectedCategory]);
 
   const loadData = async () => {
-    console.log('[API] Loading restaurants & categories...');
     try {
+      console.log('[API] Loading restaurants & categories...');
+      setLoading(true);
+
+      // Fetch restaurants and categories
       const [restaurantsRes, categoriesRes] = await Promise.all([
         restaurantAPI.getAll(),
         restaurantAPI.getCategories(),
       ]);
 
-      console.log('[API] Restaurants response:', restaurantsRes?.data);
-      console.log('[API] Categories response:', categoriesRes?.data);
+      console.log('[API] Restaurants:', restaurantsRes.data);
+      console.log('[API] Categories:', categoriesRes.data);
 
-      if (restaurantsRes.data.success) {
-        setRestaurants(restaurantsRes.data.data);
-        console.log(
-          '[State] Restaurants set:',
-          restaurantsRes.data.data.length
-        );
-      }
-
-      if (categoriesRes.data.success) {
-        setCategories(categoriesRes.data.data);
-        console.log(
-          '[State] Categories set:',
-          categoriesRes.data.data.length
-        );
-      }
+      setRestaurants(restaurantsRes.data.data || restaurantsRes.data);
+      setCategories(categoriesRes.data.data || categoriesRes.data);
     } catch (error) {
       console.error('[API ERROR] Failed to load data:', error);
-      setSnackbarMessage('Failed to load restaurants');
-      setSnackbarVisible(true);
+      console.error('[API ERROR] Error details:', error.response?.data || error.message);
+      // Set empty arrays on error so UI still works
+      setRestaurants([]);
+      setCategories([]);
     } finally {
       setLoading(false);
-      setRefreshing(false);
       console.log('[API] Loading finished');
     }
   };
 
-  const onRefresh = useCallback(() => {
-    console.log('[UI] Pull-to-refresh triggered');
+  const onRefresh = async () => {
     setRefreshing(true);
-    loadData();
-  }, []);
-
-  const filterRestaurants = () => {
-    let filtered = restaurants;
-
-    if (searchQuery) {
-      filtered = filtered.filter((restaurant) =>
-        restaurant.name.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-      console.log('[Filter] After search:', filtered.length);
-    }
-
-    if (selectedCategory) {
-      filtered = filtered.filter(
-        (restaurant) => restaurant.category === selectedCategory
-      );
-      console.log('[Filter] After category:', filtered.length);
-    }
-
-    setFilteredRestaurants(filtered);
+    await loadData();
+    setRefreshing(false);
   };
 
-  const handleCategoryPress = (category) => {
-    console.log('[UI] Category pressed:', category.name);
+  const filteredRestaurants = restaurants.filter((restaurant) => {
+    const matchesSearch = restaurant.name
+      ?.toLowerCase()
+      .includes(searchQuery.toLowerCase());
+    const matchesCategory =
+      !selectedCategory || restaurant.category === selectedCategory;
+    return matchesSearch && matchesCategory;
+  });
 
-    if (selectedCategory === category.name) {
-      console.log('[State] Category cleared');
-      setSelectedCategory(null);
-    } else {
-      console.log('[State] Category selected:', category.name);
-      setSelectedCategory(category.name);
-    }
+  const popularRestaurants = filteredRestaurants.filter((r) => r.isPopular);
+  console.log('[Derived] Popular restaurants:', popularRestaurants.length);
+
+  const renderCategoryChip = ({ item }) => {
+    // Support both object categories ({ name, icon }) and simple string categories
+    const categoryName = typeof item === 'string' ? item : item.name;
+    const categoryIcon = typeof item === 'string' ? undefined : item.icon;
+
+    return (
+      <Chip
+        icon={categoryIcon}
+        selected={selectedCategory === categoryName}
+        onPress={() =>
+          setSelectedCategory(
+            selectedCategory === categoryName ? null : categoryName
+          )
+        }
+        style={styles.categoryChip}
+        mode="outlined"
+      >
+        {categoryName}
+      </Chip>
+    );
   };
+
+  const renderRestaurant = ({ item }) => (
+    <RestaurantCard
+      restaurant={item}
+      onPress={() =>
+        navigation.navigate('Restaurant', { restaurantId: item._id })
+      }
+    />
+  );
 
   if (loading) {
     console.log('[UI] Showing loading spinner');
-    return <LoadingSpinner message="Loading restaurants..." />;
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <Text style={styles.loadingText}>Loading restaurants...</Text>
+      </View>
+    );
   }
-
-  const popularRestaurants = restaurants.filter((r) => r.isPopular);
-  console.log('[Derived] Popular restaurants:', popularRestaurants.length);
 
   return (
     <View style={styles.container}>
+      {/* Header */}
       <View style={styles.header}>
-        <View style={styles.headerTop}>
+        <View style={styles.headerContent}>
           <View>
-            <Text style={styles.greeting}>Hello! 👋</Text>
-            <Text style={styles.location}>
-              <Ionicons name="location" size={16} color={COLORS.primary} />
-              {' '}Rawalpindi, Pakistan
+            <Text variant="titleMedium" style={styles.greeting}>
+              Hello, {user?.name || 'Guest'}!
+            </Text>
+            <Text variant="bodySmall" style={styles.subtitle}>
+              What would you like to eat today?
             </Text>
           </View>
+          <TouchableOpacity
+            style={styles.cartButton}
+            onPress={() => navigation.navigate('Cart')}
+          >
+            <Ionicons name="cart-outline" size={28} color="#FF6B35" />
+            {getCartCount() > 0 && (
+              <Badge style={styles.cartBadge}>{getCartCount()}</Badge>
+            )}
+          </TouchableOpacity>
         </View>
 
-        <SearchBar
+        {/* Search Bar */}
+        <Searchbar
+          placeholder="Search restaurants..."
+          onChangeText={setSearchQuery}
           value={searchQuery}
-          onChangeText={(text) => {
-            console.log('[UI] Search changed:', text);
-            setSearchQuery(text);
-          }}
-          placeholder="Search restaurants or cuisines..."
+          style={styles.searchBar}
+          iconColor="#FF6B35"
         />
+
+        {/* Categories */}
+        {categories.length > 0 && (
+          <FlatList
+            horizontal
+            data={categories}
+            renderItem={renderCategoryChip}
+            keyExtractor={(item, index) =>
+              typeof item === 'string'
+                ? item
+                : item.name || String(index)
+            }
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categoriesContainer}
+          />
+        )}
       </View>
 
+      {/* Restaurants List */}
       <ScrollView
-        style={styles.content}
+        style={styles.scrollView}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Categories</Text>
-          <FlatList
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            data={categories}
-            keyExtractor={(item) => item.name}
-            renderItem={({ item }) => (
-              <CategoryCard
-                category={item}
-                onPress={() => handleCategoryPress(item)}
-              />
-            )}
-            contentContainerStyle={styles.categoriesList}
-          />
-        </View>
-
-        {!searchQuery && !selectedCategory && popularRestaurants.length > 0 && (
+        {/* Popular Restaurants */}
+        {popularRestaurants.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Popular Restaurants</Text>
-            {popularRestaurants.map((restaurant) => (
-              <RestaurantCard
-                key={restaurant._id}
-                restaurant={restaurant}
-                onPress={() => {
-                  console.log('[Navigation] Open restaurant:', restaurant._id);
-                  navigation.navigate('Restaurant', { id: restaurant._id });
-                }}
-              />
-            ))}
+            <Text variant="titleLarge" style={styles.sectionTitle}>
+              Popular Restaurants
+            </Text>
+            <FlatList
+              horizontal
+              data={popularRestaurants}
+              renderItem={renderRestaurant}
+              keyExtractor={(item) => item._id}
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.horizontalList}
+            />
           </View>
         )}
 
+        {/* All Restaurants */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
+          <Text variant="titleLarge" style={styles.sectionTitle}>
             {selectedCategory
               ? `${selectedCategory} Restaurants`
-              : searchQuery
-              ? 'Search Results'
               : 'All Restaurants'}
           </Text>
-
           {filteredRestaurants.length > 0 ? (
             filteredRestaurants.map((restaurant) => (
               <RestaurantCard
                 key={restaurant._id}
                 restaurant={restaurant}
-                onPress={() => {
-                  console.log('[Navigation] Open restaurant:', restaurant._id);
-                  navigation.navigate('Restaurant', { id: restaurant._id });
-                }}
+                onPress={() =>
+                  navigation.navigate('Restaurant', {
+                    restaurantId: restaurant._id,
+                  })
+                }
               />
             ))
           ) : (
-            <View style={styles.emptyContainer}>
-              <Ionicons name="restaurant-outline" size={64} color={COLORS.grey} />
-              <Text style={styles.emptyText}>No restaurants found</Text>
-            </View>
+            <Card style={styles.emptyCard}>
+              <Card.Content>
+                <Text style={styles.emptyText}>No restaurants found</Text>
+              </Card.Content>
+            </Card>
           )}
         </View>
       </ScrollView>
-
-      {getCartCount() > 0 && (
-        <FAB
-          icon="cart"
-          label={`${getCartCount()} items`}
-          style={styles.fab}
-          onPress={() => {
-            console.log('[Navigation] Open cart');
-            navigation.navigate('Cart');
-          }}
-          color={COLORS.white}
-        />
-      )}
-
-      <Snackbar
-        visible={snackbarVisible}
-        onDismiss={() => {
-          console.log('[UI] Snackbar dismissed');
-          setSnackbarVisible(false);
-        }}
-        duration={3000}
-      >
-        {snackbarMessage}
-      </Snackbar>
     </View>
   );
-};
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F7F7F7',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F7F7F7',
+  },
+  loadingText: {
+    marginTop: 10,
+    color: '#666',
+  },
+  header: {
+    backgroundColor: '#FFFFFF',
+    paddingTop: 50,
+    paddingHorizontal: 20,
+    paddingBottom: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  greeting: {
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  subtitle: {
+    color: '#666',
+    marginTop: 5,
+  },
+  cartButton: {
+    position: 'relative',
+  },
+  cartBadge: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    backgroundColor: '#FF6B35',
+  },
+  searchBar: {
+    marginBottom: 15,
+    elevation: 0,
+    backgroundColor: '#F5F5F5',
+  },
+  categoriesContainer: {
+    paddingVertical: 5,
+  },
+  categoryChip: {
+    marginRight: 10,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  section: {
+    marginTop: 20,
+    paddingHorizontal: 20,
+  },
+  sectionTitle: {
+    fontWeight: 'bold',
+    marginBottom: 15,
+    color: '#333',
+  },
+  horizontalList: {
+    paddingRight: 20,
+  },
+  emptyCard: {
+    marginVertical: 20,
+  },
+  emptyText: {
+    textAlign: 'center',
+    color: '#666',
+  },
+});

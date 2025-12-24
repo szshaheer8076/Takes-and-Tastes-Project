@@ -1,22 +1,26 @@
+// App.js
 import React from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { Provider as PaperProvider } from 'react-native-paper';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { Provider as PaperProvider, MD3LightTheme } from 'react-native-paper';
 import { AuthProvider } from './src/context/AuthContext';
 import { CartProvider } from './src/context/CartContext';
 import AppNavigator from './src/navigation/AppNavigator';
-import { COLORS } from './src/utils/constants';
 
+// Define custom theme
 const theme = {
+  ...MD3LightTheme,
   colors: {
-    primary: COLORS.primary,
-    accent: COLORS.secondary,
-    background: COLORS.white,
-    surface: COLORS.white,
-    text: COLORS.dark,
-    error: COLORS.error,
-    disabled: COLORS.grey,
-    placeholder: COLORS.grey,
+    ...MD3LightTheme.colors,
+    primary: '#FF6B35',
+    secondary: '#004E89',
+    background: '#F7F7F7',
+    surface: '#FFFFFF',
+    error: '#F44336',
+    onPrimary: '#FFFFFF',
+    onSecondary: '#FFFFFF',
+    onBackground: '#333333',
+    onSurface: '#333333',
   },
 };
 
